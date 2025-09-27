@@ -1,9 +1,7 @@
 'use client';
 
-import Script from 'next/script';
-import React, { useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 
-// Tell TypeScript that window may have jotformEmbedHandler
 declare global {
   interface Window {
     jotformEmbedHandler?: (selector: string, host: string) => void;
@@ -11,18 +9,30 @@ declare global {
 }
 
 export default function VinylQuote() {
-  const formId = '252658441657163';
+  const formId = '252658441657163'; // Vinyl Quote form ID
   const iframeId = `JotFormIFrame-${formId}`;
+  const didRunRef = useRef(false);
+  const [visible, setVisible] = useState(false);
 
-  const handleJotformLoaded = useCallback(() => {
-    try {
-      if (typeof window !== 'undefined' && typeof window.jotformEmbedHandler === 'function') {
-        window.jotformEmbedHandler(`iframe[id='${iframeId}']`, 'https://form.jotform.com/');
-      } else {
-        console.warn('Jotform handler not found (fallback height remains).');
+  const handleIframeLoad = useCallback(() => {
+    if (!didRunRef.current) {
+      didRunRef.current = true;
+      try {
+        if (typeof window !== 'undefined' && typeof window.jotformEmbedHandler === 'function') {
+          window.jotformEmbedHandler(`iframe[id='${iframeId}']`, 'https://form.jotform.com/');
+        }
+      } catch (err) {
+        console.error('Jotform init error:', err);
       }
-    } catch (err) {
-      console.error('Jotform init error:', err);
+
+      // Delay reveal until after first resize
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTimeout(() => setVisible(true), 60);
+        });
+      });
+    } else {
+      setVisible(true);
     }
   }, [iframeId]);
 
@@ -30,21 +40,22 @@ export default function VinylQuote() {
     <main className="min-h-screen bg-black text-white flex flex-col items-center px-4 py-10">
       <h1 className="text-4xl font-bold mb-6 text-white">Get Your Free Quote</h1>
 
-      <div className="w-full max-w-4xl">
+      <div className="w-full max-w-4xl" style={{ minHeight: 1600 }}>
         <iframe
           id={iframeId}
           title="Vinyl Quote Form"
           allow="geolocation; microphone; camera; fullscreen; payment"
-          src={`https://form.jotform.com/${formId}`}
-          style={{ minWidth: '100%', maxWidth: '100%', height: '1600px', border: 'none' }}
+          src={`https://form.jotform.com/${formId}?isIframeEmbed=1`}
+          style={{
+            minWidth: '100%',
+            maxWidth: '100%',
+            height: '1600px',
+            border: 'none',
+            visibility: visible ? 'visible' : 'hidden',
+          }}
           frameBorder={0}
           scrolling="no"
-        />
-
-        <Script
-          src="https://cdn.jotfor.ms/s/umd/latest/for-form-embed-handler.js"
-          strategy="afterInteractive"
-          onLoad={handleJotformLoaded}
+          onLoad={handleIframeLoad}
         />
       </div>
     </main>
