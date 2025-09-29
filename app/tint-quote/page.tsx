@@ -2,6 +2,7 @@
 
 import React from "react";
 import Script from "next/script";
+import Link from "next/link";
 
 const TINT_FORM_ID = "252646676868073";
 
@@ -11,7 +12,7 @@ const TintQuotePage: React.FC = () => {
   return (
     <main className="min-h-screen bg-black text-white">
       {/* Back to Home */}
-      <a
+      <Link
   href="/"
   className="fixed top-4 left-4 z-50 font-bold py-2 px-4 rounded-lg shadow-md transition"
   style={{
@@ -22,7 +23,7 @@ const TintQuotePage: React.FC = () => {
   onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#2c4ece")}
 >
   ← Back to Home
-</a>
+</Link>
 
       <h1 className="pt-16 text-center text-3xl font-bold">Get Your Free Quote</h1>
 
