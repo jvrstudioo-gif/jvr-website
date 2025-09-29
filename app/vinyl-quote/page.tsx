@@ -6,6 +6,8 @@ import Script from "next/script";
 const VINYL_FORM_ID = "252658441657163";
 const IFRAME_ID = `JotFormIFrame-${VINYL_FORM_ID}`;
 
+type JotformEmbed = (selector: string, base: string) => void;
+
 export default function VinylQuotePage() {
   return (
     <main className="min-h-screen bg-black text-white">
@@ -22,10 +24,8 @@ export default function VinylQuotePage() {
         </Link>
       </div>
 
-      {/* Title */}
       <h1 className="text-center text-3xl font-bold">Get Your Free Quote</h1>
 
-      {/* Jotform embed (auto-resizes; only page scrollbar) */}
       <section className="mx-auto w-full max-w-4xl p-4">
         <iframe
           id={IFRAME_ID}
@@ -36,15 +36,13 @@ export default function VinylQuotePage() {
           scrolling="no"
           allow="geolocation; microphone; camera; fullscreen; payment"
         />
+
         <Script
           src="https://cdn.jotfor.ms/s/umd/latest/for-form-embed-handler.js"
           strategy="afterInteractive"
           onLoad={() => {
-            // @ts-ignore
-            if (window?.jotformEmbedHandler) {
-              // @ts-ignore
-              window.jotformEmbedHandler(`iframe[id='${IFRAME_ID}']`, "https://form.jotform.com/");
-            }
+            const w = window as unknown as { jotformEmbedHandler?: JotformEmbed };
+            w.jotformEmbedHandler?.(`iframe[id='${IFRAME_ID}']`, "https://form.jotform.com/");
           }}
         />
       </section>

@@ -6,6 +6,9 @@ import Script from "next/script";
 const TINT_FORM_ID = "252646676868073";
 const IFRAME_ID = `JotFormIFrame-${TINT_FORM_ID}`;
 
+// Local type for the script injected by Jotform
+type JotformEmbed = (selector: string, base: string) => void;
+
 export default function TintQuotePage() {
   return (
     <main className="min-h-screen bg-black text-white">
@@ -22,31 +25,25 @@ export default function TintQuotePage() {
         </Link>
       </div>
 
-      {/* Title */}
       <h1 className="text-center text-3xl font-bold">Get Your Free Quote</h1>
 
-      {/* Jotform embed (auto-resizes; only page scrollbar) */}
       <section className="mx-auto w-full max-w-4xl p-4">
         <iframe
           id={IFRAME_ID}
           title="Tint Form"
           src={`https://form.jotform.com/${TINT_FORM_ID}`}
           className="w-full rounded-xl border-0"
-          // modest starting height; Jotform script will set the exact height
-          style={{ height: 1600, overflow: "hidden" }}
-          scrolling="no"
+          style={{ height: 1600, overflow: "hidden" }}   // starter height; script will resize
+          scrolling="no"                                  // single scrollbar (page only)
           allow="geolocation; microphone; camera; fullscreen; payment"
         />
+
         <Script
           src="https://cdn.jotfor.ms/s/umd/latest/for-form-embed-handler.js"
           strategy="afterInteractive"
           onLoad={() => {
-            // provided by Jotform script
-            // @ts-ignore
-            if (window?.jotformEmbedHandler) {
-              // @ts-ignore
-              window.jotformEmbedHandler(`iframe[id='${IFRAME_ID}']`, "https://form.jotform.com/");
-            }
+            const w = window as unknown as { jotformEmbedHandler?: JotformEmbed };
+            w.jotformEmbedHandler?.(`iframe[id='${IFRAME_ID}']`, "https://form.jotform.com/");
           }}
         />
       </section>
