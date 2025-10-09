@@ -1,25 +1,27 @@
-// app/layout.tsx
-import './globals.css';
-import type { Metadata } from 'next';
-import Script from 'next/script';
+import "./globals.css";
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import Providers from "./providers";
+import FooterGate from "./components/FooterGate";
 
 export const metadata: Metadata = {
-  title: 'JVR Studio',
-  description: '…',
+  title: "JVR Studio",
+  description: "Custom Style, Professional Results",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   return (
     <html lang="en">
-      <body>
-        {children}
-
-        {/* Load Jotform embed handler ONCE for the whole app */}
-        <Script
-          src="https://cdn.jotfor.ms/s/umd/latest/for-form-embed-handler.js"
-          strategy="afterInteractive"
-          id="jotform-embed-handler"
-        />
+      <body className="bg-black text-white">
+        <Providers>
+          {children}
+          {/* ✅ Footer only appears where FooterGate allows */}
+          <FooterGate />
+        </Providers>
       </body>
     </html>
   );

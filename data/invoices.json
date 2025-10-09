@@ -1,0 +1,35 @@
+[
+  {
+    "id": "INV-2025-0005",
+    "number": "INV-2025-0005",
+    "status": "PAID",
+    "issue_date": "2025-10-08",
+    "due_date": "2025-10-08",
+    "customer": {
+      "name": "Juan Lopez",
+      "email": "juanlopez5799@gmail.com",
+      "phone": "7204000218"
+    },
+    "items": [
+      {
+        "id": "line-1",
+        "name": "Tint Removal - Full Vehicle ",
+        "description": "2011 Audi S4",
+        "qty": 1,
+        "unit_price": 15000
+      }
+    ],
+    "subtotal_cents": 15000,
+    "taxes_fees_cents": 0,
+    "total_cents": 15000,
+    "amount_paid_cents": 15000,
+    "balance_due_cents": 0,
+    "payment_method": "square_tap",
+    "paid_at": "2025-10-09T00:00:40.829Z",
+    "notes": "",
+    "terms": "",
+    "updatedAt": "2025-10-09T00:01:57.100Z",
+    "sentAt": "2025-10-09T00:01:57.100Z",
+    "lastEmailId": "<bf39c9f4-28c2-e537-4020-68ee08d548c4@gmail.com>"
+  }
+]
