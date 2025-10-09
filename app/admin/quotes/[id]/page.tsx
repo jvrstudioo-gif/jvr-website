@@ -27,8 +27,14 @@ async function deleteAction(formData: FormData) {
 
 export const revalidate = 0;
 
-export default async function QuoteDetailPage({ params }: { params: { id: string } }) {
-  const quote = await findQuote(params.id);
+export default async function QuoteDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  const quote = await findQuote(id);
   if (!quote) return notFound();
 
   const displayName =

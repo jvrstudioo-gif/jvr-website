@@ -1,6 +1,7 @@
-// app/admin/bookings/page.tsx
+// app/admin/bookings/page.tsx 
 import Link from "next/link";
-import { getAllBookings } from "@/lib/bookings";
+import { revalidatePath } from "next/cache";
+import { getAllBookings, removeBooking } from "@/lib/bookings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,10 +22,17 @@ type BookingRow = {
   // add any extra fields your store returns
 };
 
+// server action: delete booking by id
+async function deleteBookingAction(formData: FormData) {
+  "use server";
+  const id = String(formData.get("id") || "");
+  if (!id) return;
+  await removeBooking(id);
+  revalidatePath("/admin/bookings");
+  revalidatePath("/admin");
+}
+
 function fmtDate(d: string) {
-  // If your dates are already "YYYY-MM-DD", this keeps it concise.
-  // Swap to locale if you prefer:
-  // return new Date(d + "T12:00:00").toLocaleDateString();
   return d;
 }
 
@@ -33,7 +41,6 @@ function fmtTime(t?: string) {
 }
 
 export default async function AdminBookingsPage() {
-  // Fetch from your JSON store (or future Google Calendar) via lib/bookings
   const raw = (await getAllBookings()) as BookingRow[];
 
   // Sort upcoming first: by date then time
@@ -84,12 +91,13 @@ export default async function AdminBookingsPage() {
                 <th className="px-4 py-3 text-left">Phone</th>
                 <th className="px-4 py-3 text-left">Email</th>
                 <th className="px-4 py-3 text-left">Notes</th>
+                <th className="px-4 py-3 text-right pr-4">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {rows.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-6 text-zinc-400" colSpan={7}>
+                  <td className="px-4 py-6 text-zinc-400" colSpan={8}>
                     No bookings yet.
                   </td>
                 </tr>
@@ -104,6 +112,21 @@ export default async function AdminBookingsPage() {
                     <td className="px-4 py-3">{r.email ?? "—"}</td>
                     <td className="px-4 py-3 max-w-[28rem] truncate" title={r.notes}>
                       {r.notes ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right pr-4">
+                      {r.id ? (
+                        <form action={deleteBookingAction} className="inline">
+                          <input type="hidden" name="id" value={r.id} />
+                          <button
+                            className="rounded-xl border border-white/15 px-3 py-1 hover:border-red-400/60 hover:text-red-300 transition"
+                            title="Delete booking"
+                          >
+                            Delete
+                          </button>
+                        </form>
+                      ) : (
+                        <span className="opacity-60">—</span>
+                      )}
                     </td>
                   </tr>
                 ))

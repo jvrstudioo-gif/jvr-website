@@ -32,3 +32,21 @@ export async function getAllBookings(): Promise<BookingRow[]> {
     return [];
   }
 }
+
+// ----- NEW: writer used by removeBooking -----
+async function writeBookings(list: BookingRow[]): Promise<void> {
+  await fs.mkdir(path.dirname(BOOKINGS_PATH), { recursive: true });
+  await fs.writeFile(BOOKINGS_PATH, JSON.stringify(list, null, 2), "utf8");
+}
+
+// ----- NEW: delete a booking by id -----
+export async function removeBooking(id: string): Promise<boolean> {
+  const list = await getAllBookings();
+  const next = list.filter((b) => String(b.id) !== String(id));
+  if (next.length === list.length) return false; // nothing removed
+  await writeBookings(next);
+  return true;
+}
+
+// Optional alias (handy if your page imports readBookings)
+export const readBookings = getAllBookings;

@@ -35,11 +35,13 @@ export const revalidate = 0;
 export default async function AdminQuotesPage({
   searchParams,
 }: {
-  searchParams?: SearchParams;
+  // Next 15: searchParams is a Promise on server components
+  searchParams: Promise<Partial<SearchParams>>;
 }) {
-  const q = (searchParams?.q ?? "").trim().toLowerCase();
-  const statusFilter = (searchParams?.status ?? "all") as SearchParams["status"];
-  const page = Math.max(1, parseInt(searchParams?.page || "1", 10) || 1);
+  const sp = (await searchParams) ?? {};
+  const q = (sp.q ?? "").trim().toLowerCase();
+  const statusFilter = (sp.status ?? "all") as SearchParams["status"];
+  const page = Math.max(1, parseInt(sp.page || "1", 10) || 1);
   const pageSize = 20;
 
   const all: QuoteRecord[] = await readQuotes();
