@@ -1,6 +1,5 @@
 // lib/quotes.ts
-import { promises as fs } from "fs";
-import path from "path";
+import { list, put, del } from "@vercel/blob";
 
 export type QuoteRecord = {
   id: string;
@@ -47,48 +46,99 @@ export type QuoteRecord = {
   raw?: any;
 };
 
-const QUOTES_PATH = path.join(process.cwd(), "data", "quotes.json");
+// ---- Blob helpers -----------------------------------------------------------
 
-async function ensureFile() {
-  try { await fs.access(QUOTES_PATH); }
-  catch {
-    await fs.mkdir(path.dirname(QUOTES_PATH), { recursive: true });
-    await fs.writeFile(QUOTES_PATH, "[]", "utf8");
+const PREFIX = "quotes/";
+const token = process.env.BLOB_READ_WRITE_TOKEN;
+
+function ensureToken() {
+  if (!token) {
+    throw new Error(
+      "Missing BLOB_READ_WRITE_TOKEN environment variable. " +
+        "Add it in Vercel → Project → Settings → Environment Variables."
+    );
   }
 }
 
+function filePath(id: string) {
+  // keep filenames predictable and safe
+  return `${PREFIX}${encodeURIComponent(id)}.json`;
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch blob JSON: ${res.status}`);
+  return (await res.json()) as T;
+}
+
+// ---- Public API (same names/signatures as your previous file) ---------------
+
 export async function readQuotes(): Promise<QuoteRecord[]> {
-  await ensureFile();
-  const txt = await fs.readFile(QUOTES_PATH, "utf8");
-  const arr = JSON.parse(txt || "[]");
-  return Array.isArray(arr) ? arr : [];
+  ensureToken();
+  const { blobs } = await list({ prefix: PREFIX, token });
+  const records = await Promise.all(
+    blobs.map(async (b) => {
+      try {
+        // list() returns a (short-lived) signed URL we can fetch
+        return await fetchJson<QuoteRecord>(b.url);
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  const items = (records.filter(Boolean) as QuoteRecord[]);
+
+  // Keep your UI expectations: newest first
+  items.sort(
+    (a, b) =>
+      new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+  );
+
+  return items;
 }
 
 export async function addQuote(newQuote: QuoteRecord) {
-  const all = await readQuotes();
-  all.unshift(newQuote);
-  await fs.writeFile(QUOTES_PATH, JSON.stringify(all, null, 2), "utf8");
+  ensureToken();
+  if (!newQuote?.id) throw new Error("addQuote: missing quote id");
+  await put(filePath(newQuote.id), JSON.stringify(newQuote, null, 2), {
+    access: "private",
+    contentType: "application/json",
+    token,
+  });
 }
 
-export async function updateQuote(id: string, patch: Partial<QuoteRecord>) {
-  const all = await readQuotes();
-  const i = all.findIndex((q) => q.id === id);
-  if (i === -1) return false;
-  all[i] = { ...all[i], ...patch };
-  await fs.writeFile(QUOTES_PATH, JSON.stringify(all, null, 2), "utf8");
+export async function updateQuote(
+  id: string,
+  patch: Partial<QuoteRecord>
+) {
+  ensureToken();
+  const existing = await findQuote(id);
+  if (!existing) return false;
+
+  const updated: QuoteRecord = { ...existing, ...patch };
+  await put(filePath(id), JSON.stringify(updated, null, 2), {
+    access: "private",
+    contentType: "application/json",
+    token,
+  });
   return true;
 }
 
 export async function removeQuote(id: string) {
-  const all = await readQuotes();
-  const next = all.filter((q) => q.id !== id);
-  if (next.length === all.length) return false;
-  await fs.writeFile(QUOTES_PATH, JSON.stringify(next, null, 2), "utf8");
+  ensureToken();
+  await del(filePath(id), { token });
   return true;
 }
 
 export async function findQuote(id: string) {
-  const all = await readQuotes();
-  return all.find((q) => q.id === id) ?? null;
+  ensureToken();
+  // list() by exact prefix to locate the single file
+  const { blobs } = await list({ prefix: filePath(id), token });
+  if (!blobs.length) return null;
+  try {
+    return await fetchJson<QuoteRecord>(blobs[0].url);
+  } catch {
+    return null;
+  }
 }
-
