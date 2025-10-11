@@ -53,23 +53,11 @@ export async function POST(req: NextRequest) {
       tintType: body.tintType ?? null,
       tintShade: body.tintShade ?? null,
       vehicleType: body.vehicleType ?? null,
-      coverage: Array.isArray(body.coverage)
-        ? body.coverage
-        : body.coverage
-        ? [body.coverage]
-        : null,
+      coverage: Array.isArray(body.coverage) ? body.coverage : body.coverage ? [body.coverage] : null,
 
-      removalAreas: Array.isArray(body.removalAreas)
-        ? body.removalAreas
-        : body.removalAreas
-        ? [body.removalAreas]
-        : null,
+      removalAreas: Array.isArray(body.removalAreas) ? body.removalAreas : body.removalAreas ? [body.removalAreas] : null,
 
-      chromeAreas: Array.isArray(body.chromeAreas)
-        ? body.chromeAreas
-        : body.chromeAreas
-        ? [body.chromeAreas]
-        : null,
+      chromeAreas: Array.isArray(body.chromeAreas) ? body.chromeAreas : body.chromeAreas ? [body.chromeAreas] : null,
 
       decalSize: body.decalSize ?? null,
       decalColor: body.decalColor ?? null,
@@ -78,10 +66,9 @@ export async function POST(req: NextRequest) {
       raw: { ...body, ua: req.headers.get("user-agent") },
     };
 
-    // Save to Blob
     await addQuote(record);
 
-    // Fire-and-forget email (don’t fail the request if SMTP hiccups)
+    // fire-and-forget email (don’t block success)
     sendQuoteNotification(ADMIN_EMAIL, record).catch((e) =>
       console.error("Email notification failed:", e)
     );

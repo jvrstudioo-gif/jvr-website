@@ -3,84 +3,63 @@ import nodemailer from "nodemailer";
 import type { QuoteRecord } from "@/lib/quotes";
 
 const host = process.env.SMTP_HOST || "smtp.gmail.com";
-const port = Number(process.env.SMTP_PORT || 587);
+const port = Number(process.env.SMTP_PORT || 465);
 const secure = port === 465;
 
 const user = process.env.SMTP_USER;
 const pass = process.env.SMTP_PASS;
 const from = process.env.FROM_EMAIL;
 
-if (!user || !pass) {
-  // Fail fast at boot if SMTP auth isn’t configured
-  console.warn("[mailer] Missing SMTP_USER / SMTP_PASS");
-}
-
 export const transporter = nodemailer.createTransport({
   host,
   port,
   secure,
-  auth: { user, pass },
+  auth: user && pass ? { user, pass } : undefined,
+  pool: true,
+  maxConnections: 2,
+  maxMessages: 50,
+  connectionTimeout: 20_000,
+  greetingTimeout: 10_000,
+  socketTimeout: 30_000,
+  tls: { minVersion: "TLSv1.2", rejectUnauthorized: true },
 });
 
-export async function sendMail(opts: {
-  to: string;
-  subject: string;
-  html: string;
-  text?: string;
-}) {
+export async function sendMail(opts: { to: string; subject: string; html: string }) {
   if (!from) throw new Error("FROM_EMAIL not configured");
   const info = await transporter.sendMail({
     from,
     to: opts.to,
     subject: opts.subject,
     html: opts.html,
-    text: opts.text ?? opts.html.replace(/<[^>]+>/g, " "), // fallback plain text
   });
   return info.messageId;
 }
 
-/** Nicely formatted notification for a new quote */
 export async function sendQuoteNotification(to: string, q: QuoteRecord) {
-  const subject = `New Quote – ${q.service ?? "Service"} (${q.id})`;
-
-  const textLines = [
-    `Received: ${q.receivedAt}`,
-    `Service:  ${q.service ?? "-"}`,
-    `Name:     ${(q.firstName ?? "-") + " " + (q.lastName ?? "")}`.trim(),
-    `Email:    ${q.email ?? "-"}`,
-    `Phone:    ${q.phone ?? "-"}`,
-    `Vehicle:  ${q.ymm ?? "-"}`,
-    `Tint:     ${q.tintType ?? "-"} ${q.tintShade ? `(${q.tintShade})` : ""}`,
-    `Coverage: ${q.coverage?.join(", ") ?? "-"}`,
-    "",
-    "Details:",
-    q.details ?? "-",
-    "",
-    `Quote ID: ${q.id}`,
-  ];
-  const text = textLines.join("\n");
-
-  // basic HTML version
-  const esc = (s: string) =>
-    s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!));
-
+  const subject = `New Quote Request #${q.id} — ${q.service ?? "Service"}`;
   const html = `
-  <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5">
-    <h2 style="margin:0 0 8px">New Quote</h2>
-    <p><b>Received:</b> ${q.receivedAt}</p>
-    <p><b>Service:</b> ${q.service ?? "-"}</p>
-    <p><b>Name:</b> ${(q.firstName ?? "-") + " " + (q.lastName ?? "")}</p>
-    <p><b>Email:</b> ${q.email ?? "-"}</p>
-    <p><b>Phone:</b> ${q.phone ?? "-"}</p>
-    <p><b>Vehicle:</b> ${q.ymm ?? "-"}</p>
-    <p><b>Tint:</b> ${q.tintType ?? "-"} ${q.tintShade ? `(${q.tintShade})` : ""}</p>
-    <p><b>Coverage:</b> ${q.coverage?.join(", ") ?? "-"}</p>
-    <p><b>Details</b></p>
-    <pre style="white-space:pre-wrap;margin:0;background:#0b0b0b;padding:10px;border-radius:8px;color:#eee">
-${esc(q.details ?? "-")}
-    </pre>
-    <p style="margin-top:12px;color:#888">Quote ID: ${q.id}</p>
-  </div>`.trim();
+    <div style="font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif">
+      <h2>New Quote Request</h2>
+      <p><strong>Received:</strong> ${q.receivedAt}</p>
+      <p><strong>Service:</strong> ${q.service ?? "-"}</p>
+      <p><strong>Name:</strong> ${[q.firstName, q.lastName].filter(Boolean).join(" ") || "-"}</p>
+      <p><strong>Email:</strong> ${q.email ?? "-"}</p>
+      <p><strong>Phone:</strong> ${q.phone ?? "-"}</p>
+      <p><strong>Vehicle:</strong> ${q.ymm ?? "-"}</p>
 
-  await sendMail({ to, subject, html, text });
+      ${q.service === "Window Tint" ? `
+        <p><strong>Tint Type:</strong> ${q.tintType ?? "-"}</p>
+        <p><strong>Shade:</strong> ${q.tintShade ?? "-"}</p>
+        <p><strong>Vehicle Type:</strong> ${q.vehicleType ?? "-"}</p>
+        <p><strong>Coverage:</strong> ${(q.coverage ?? []).join(", ") || "-"}</p>
+      ` : ""}
+
+      ${q.details ? `<p><strong>Details:</strong><br>${String(q.details).replace(/\n/g,"<br>")}</p>` : ""}
+
+      <hr>
+      <p style="color:#555">Quote ID: ${q.id}</p>
+    </div>
+  `;
+
+  return sendMail({ to, subject, html });
 }
