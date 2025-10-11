@@ -1,4 +1,6 @@
 // app/api/quote/route.ts
+export const runtime = "nodejs"; // ← ensure this API runs on the Node.js runtime
+
 import { NextRequest, NextResponse } from "next/server";
 import { addQuote, type QuoteRecord } from "@/lib/quotes";
 
@@ -80,7 +82,6 @@ export async function POST(req: NextRequest) {
       raw: { ...body, ua: req.headers.get("user-agent") },
     };
 
-    // Write to Vercel Blob (handled inside lib/quotes)
     await addQuote(record);
 
     return NextResponse.json({ ok: true, id: record.id });

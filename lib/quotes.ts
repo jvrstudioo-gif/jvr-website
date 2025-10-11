@@ -66,7 +66,7 @@ function filePath(id: string) {
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch blob JSON: ${res.status}`);
   return (await res.json()) as T;
 }
@@ -87,7 +87,7 @@ export async function readQuotes(): Promise<QuoteRecord[]> {
     })
   );
 
-  const items = (records.filter(Boolean) as QuoteRecord[]);
+  const items = records.filter(Boolean) as QuoteRecord[];
 
   // Keep your UI expectations: newest first
   items.sort(
@@ -102,7 +102,7 @@ export async function addQuote(newQuote: QuoteRecord) {
   ensureToken();
   if (!newQuote?.id) throw new Error("addQuote: missing quote id");
   await put(filePath(newQuote.id), JSON.stringify(newQuote, null, 2), {
-    access: "private",
+    access: "public", // <-- required so the signed URL returned by list() is readable
     contentType: "application/json",
     token,
   });
@@ -118,7 +118,7 @@ export async function updateQuote(
 
   const updated: QuoteRecord = { ...existing, ...patch };
   await put(filePath(id), JSON.stringify(updated, null, 2), {
-    access: "private",
+    access: "public", // <-- same here
     contentType: "application/json",
     token,
   });
