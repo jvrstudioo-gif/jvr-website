@@ -1,8 +1,11 @@
 // app/api/quote/route.ts
-export const runtime = "nodejs"; // ← ensure this API runs on the Node.js runtime
+export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { addQuote, type QuoteRecord } from "@/lib/quotes";
+import { sendQuoteNotification } from "@/lib/mailer";
+
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "jvrstudioo@gmail.com";
 
 function id() {
   return Math.random().toString(36).slice(2, 10);
@@ -34,23 +37,19 @@ export async function POST(req: NextRequest) {
       status: "new",
       source: "web",
 
-      // contact
       firstName: body.firstName ?? null,
       lastName: body.lastName ?? null,
       email: body.email ?? null,
       phone: body.phone ?? null,
 
-      // vehicle
       ymm: body.ymm ?? null,
       vin: body.vin ?? null,
 
-      // service + details
       service: body.service ?? null,
       details: body.details ?? null,
-      message: body.details ?? null, // back-compat
+      message: body.details ?? null,
       agree: !!body.agree,
 
-      // window tint (conditional)
       tintType: body.tintType ?? null,
       tintShade: body.tintShade ?? null,
       vehicleType: body.vehicleType ?? null,
@@ -60,21 +59,18 @@ export async function POST(req: NextRequest) {
         ? [body.coverage]
         : null,
 
-      // tint removal
       removalAreas: Array.isArray(body.removalAreas)
         ? body.removalAreas
         : body.removalAreas
         ? [body.removalAreas]
         : null,
 
-      // chrome delete
       chromeAreas: Array.isArray(body.chromeAreas)
         ? body.chromeAreas
         : body.chromeAreas
         ? [body.chromeAreas]
         : null,
 
-      // vinyl decal
       decalSize: body.decalSize ?? null,
       decalColor: body.decalColor ?? null,
       decalPlacement: body.decalPlacement ?? null,
@@ -82,7 +78,13 @@ export async function POST(req: NextRequest) {
       raw: { ...body, ua: req.headers.get("user-agent") },
     };
 
+    // Save to Blob
     await addQuote(record);
+
+    // Fire-and-forget email (don’t fail the request if SMTP hiccups)
+    sendQuoteNotification(ADMIN_EMAIL, record).catch((e) =>
+      console.error("Email notification failed:", e)
+    );
 
     return NextResponse.json({ ok: true, id: record.id });
   } catch (err) {
