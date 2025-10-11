@@ -1,6 +1,5 @@
 // app/api/quote/route.ts
 import { NextRequest, NextResponse } from "next/server";
-// ⬇️ Use the Blob-backed storage helpers instead of fs/path
 import { addQuote, type QuoteRecord } from "@/lib/quotes";
 
 function id() {
@@ -81,7 +80,7 @@ export async function POST(req: NextRequest) {
       raw: { ...body, ua: req.headers.get("user-agent") },
     };
 
-    // ⬇️ Write to Vercel Blob (no filesystem writes)
+    // Write to Vercel Blob (handled inside lib/quotes)
     await addQuote(record);
 
     return NextResponse.json({ ok: true, id: record.id });
