@@ -4,12 +4,10 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { sendQuoteNotification } from "@/lib/mailer";
 
-// Where to send the test message:
 const TO = process.env.ADMIN_EMAIL || "jvrstudioo@gmail.com";
 
 export async function GET() {
   try {
-    // Minimal fake "record" for the email template
     await sendQuoteNotification(TO, {
       id: "test-" + Date.now(),
       receivedAt: new Date().toISOString(),
@@ -22,7 +20,7 @@ export async function GET() {
       ymm: null,
       vin: null,
       service: "Test",
-      details: "This is a one-off SMTP verification message.",
+      details: "SMTP verification message.",
       agree: true,
       tintType: null,
       tintShade: null,
@@ -39,9 +37,6 @@ export async function GET() {
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     console.error("MAIL TEST FAILED:", e);
-    return NextResponse.json(
-      { ok: false, error: String(e?.message || e) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
 }
