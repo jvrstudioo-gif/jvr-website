@@ -3,6 +3,7 @@
 
 import { useOptimistic, useTransition } from "react";
 import type { QuoteRecord } from "@/lib/quotes";
+import { formatDenver } from "@/lib/time";
 
 type QuoteStatus = "new" | "contacted";
 
@@ -31,20 +32,6 @@ export default function QuotesTable({
     startTransition(() => {
       applyOptimistic({ id, status });
     });
-  };
-
-  const pretty = (iso?: string | null) => {
-    if (!iso) return "-";
-    const d = new Date(iso);
-    return new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Denver",
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).format(d);
   };
 
   const statusChip = (id: string, status?: string | null) => {
@@ -95,10 +82,7 @@ export default function QuotesTable({
         <tbody>
           {quotes.length === 0 ? (
             <tr>
-              <td
-                className="px-4 py-6 text-zinc-400"
-                colSpan={6}
-              >
+              <td className="px-4 py-6 text-zinc-400" colSpan={6}>
                 No quotes yet.
               </td>
             </tr>
@@ -106,7 +90,7 @@ export default function QuotesTable({
             quotes.map((q) => (
               <tr key={q.id} className="border-b border-zinc-900">
                 <td className="sticky left-0 z-0 bg-black/80 px-4 py-3 backdrop-blur">
-                  {pretty(q.receivedAt)}
+                  {formatDenver(q.receivedAt)}{/* Denver time */}
                 </td>
                 <td className="px-4 py-3">{statusChip(q.id, q.status)}</td>
                 <td className="px-4 py-3">
@@ -171,7 +155,9 @@ export default function QuotesTable({
               className="rounded-xl border border-zinc-800 bg-black/60 p-4"
             >
               <div className="mb-2 flex items-center justify-between">
-                <div className="text-xs text-zinc-400">{pretty(q.receivedAt)}</div>
+                <div className="text-xs text-zinc-400">
+                  {formatDenver(q.receivedAt)}{/* Denver time */}
+                </div>
                 {statusChip(q.id, q.status)}
               </div>
               <div className="space-y-1 text-sm">

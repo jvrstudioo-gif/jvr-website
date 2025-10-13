@@ -10,6 +10,7 @@ import {
   type QuoteRecord,
   type QuoteStatus,
 } from "@/lib/quotes";
+import { formatDenver } from "@/lib/time";
 import QuotesTable from "./QuotesTable.client";
 
 // ---------- helpers (CSV) ----------
@@ -162,7 +163,10 @@ export default async function AdminQuotesPage() {
         Current quotes: <strong>{quotes.length}</strong>{" "}
         {quotes.length > 0 && (
           <span className="ml-2">
-            (latest <code>{quotes[0].id}</code>)
+            (latest <code>{quotes[0].id}</code>
+            {" "}at{" "}
+            <code>{formatDenver(quotes[0].receivedAt)} • (Denver)</code>
+            )
           </span>
         )}
       </div>

@@ -1,211 +1,104 @@
 // app/admin/quotes/[id]/page.tsx
-import { findQuote, updateQuote, removeQuote, type QuoteRecord } from "@/lib/quotes";
-import { notFound } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import Link from "next/link";
-
-/* ----- server actions ----- */
-async function setStatusAction(formData: FormData) {
-  "use server";
-  const id = String(formData.get("id") || "");
-  const status = String(formData.get("status") || "new") as QuoteRecord["status"];
-  if (!id) return;
-  await updateQuote(id, { status });
-  revalidatePath(`/admin/quotes/${id}`);
-  revalidatePath("/admin/quotes");
-  revalidatePath("/admin");
-}
-
-async function deleteAction(formData: FormData) {
-  "use server";
-  const id = String(formData.get("id") || "");
-  if (!id) return;
-  await removeQuote(id);
-  revalidatePath("/admin/quotes");
-  revalidatePath("/admin");
-}
+import { notFound, redirect } from "next/navigation";
+import { readQuotes, type QuoteRecord } from "@/lib/quotes";
+import { formatDenver } from "@/lib/time";
 
 export const revalidate = 0;
 
-export default async function QuoteDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
+type Params = { params: { id: string } };
 
-  const quote = await findQuote(id);
-  if (!quote) return notFound();
+export default async function QuoteDetailPage({ params }: Params) {
+  const { id } = params;
 
-  const displayName =
-    [quote.firstName, quote.lastName, (quote as any)?.name].filter(Boolean).join(" ").trim() || "—";
-
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Quote Details</h1>
-          <p className="text-sm opacity-70">
-            {formatDenverTime(quote.receivedAt)} • ID {quote.id}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link
-            href="/admin/quotes"
-            className="px-4 py-2 rounded-2xl border border-white/15 hover:border-white/30 transition"
-          >
-            ← Back to All Quotes
-          </Link>
-          <Link
-            href="/admin"
-            className="px-4 py-2 rounded-2xl border border-white/15 hover:border-white/30 transition"
-          >
-            Dashboard
-          </Link>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex gap-2">
-        <form action={setStatusAction}>
-          <input type="hidden" name="id" value={quote.id} />
-          <input type="hidden" name="status" value="contacted" />
-          <button className="rounded-xl border border-white/15 px-3 py-1 hover:border-white/30 transition">
-            Mark Contacted
-          </button>
-        </form>
-        <form action={setStatusAction}>
-          <input type="hidden" name="id" value={quote.id} />
-          <input type="hidden" name="status" value="new" />
-          <button className="rounded-xl border border-white/15 px-3 py-1 hover:border-white/30 transition">
-            Mark New
-          </button>
-        </form>
-        <form action={deleteAction}>
-          <input type="hidden" name="id" value={quote.id} />
-          <button className="rounded-xl border border-white/15 px-3 py-1 hover:border-red-400/60 transition">
-            Delete
-          </button>
-        </form>
-      </div>
-
-      {/* Primary info grid */}
-      <section className="grid md:grid-cols-2 gap-4">
-        <Card title="Contact">
-          <Field label="Name" value={displayName} />
-          <Field label="Email" value={quote.email} />
-          <Field label="Phone" value={quote.phone} />
-          <Field label="Status" value={(quote.status ?? "new").toUpperCase()} />
-        </Card>
-
-        <Card title="Vehicle & Service">
-          <Field label="Year / Make / Model" value={quote.ymm} />
-          <Field label="VIN" value={quote.vin} />
-          <Field label="Service" value={quote.service} />
-          <Field label="Vehicle Type" value={quote.vehicleType} />
-        </Card>
-
-        {/* Window Tint block (only if service is Window Tint or tint fields exist) */}
-        {(quote.service === "Window Tint" ||
-          quote.tintType ||
-          quote.tintShade ||
-          quote.coverage?.length) && (
-          <Card title="Tint Details">
-            <Field label="Type" value={quote.tintType} />
-            <Field label="Shade" value={quote.tintShade} />
-            <Field
-              label="Coverage"
-              value={
-                quote.coverage?.length
-                  ? quote.coverage.join(" • ")
-                  : "—"
-              }
-            />
-          </Card>
-        )}
-
-        {/* Tint Removal block */}
-        {(quote.service === "Tint Removal" || quote.removalAreas?.length) && (
-          <Card title="Tint Removal">
-            <Field
-              label="Areas"
-              value={quote.removalAreas?.length ? quote.removalAreas.join(" • ") : "—"}
-            />
-          </Card>
-        )}
-
-        {/* Chrome Delete block */}
-        {(quote.service === "Chrome Delete" || quote.chromeAreas?.length) && (
-          <Card title="Chrome Delete">
-            <Field
-              label="Areas"
-              value={quote.chromeAreas?.length ? quote.chromeAreas.join(" • ") : "—"}
-            />
-          </Card>
-        )}
-
-        {/* Vinyl Decal block */}
-        {(quote.service === "Vinyl Decal" ||
-          quote.decalSize ||
-          quote.decalColor ||
-          quote.decalPlacement) && (
-          <Card title="Vinyl Decal">
-            <Field label="Approx. Size" value={quote.decalSize} />
-            <Field label="Color" value={quote.decalColor} />
-            <Field label="Placement" value={quote.decalPlacement} />
-          </Card>
-        )}
-
-        <Card title="Notes">
-          <div className="rounded-2xl border border-white/10 p-3 min-h-[60px]">
-            {quote.details ?? quote.message ?? "—"}
-          </div>
-        </Card>
-      </section>
-
-      {/* Raw payload */}
-      <section className="space-y-2">
-        <h2 className="text-lg font-semibold">Raw submission</h2>
-        <pre className="rounded-2xl border border-white/10 p-4 overflow-auto text-xs">
-{JSON.stringify(quote.raw ?? {}, null, 2)}
-        </pre>
-      </section>
-    </div>
-  );
-}
-
-/* --- small UI helpers --- */
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-white/10 p-4 space-y-2">
-      <h3 className="font-semibold">{title}</h3>
-      {children}
-    </div>
-  );
-}
-function Field({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <div className="opacity-70">{label}</div>
-      <div className="text-right">{value ?? "—"}</div>
-    </div>
-  );
-}
-function formatDenverTime(timestamp?: string) {
-  if (!timestamp) return "—";
+  // Be defensive: load list and find client-side to avoid throws from a helper.
+  // (If you have a safe readQuote that returns null instead of throwing, you can call that.)
+  let q: QuoteRecord | undefined;
   try {
-    const date = new Date(timestamp);
-    const fmt = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Denver",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-    return `${fmt.format(date)} • (Denver)`;
+    const all = await readQuotes();
+    q = all.find((r) => r.id === id);
   } catch {
-    return "—";
+    // If the backing store fails (blob/network), bounce back gracefully.
+    redirect("/admin/quotes?error=unavailable");
   }
+
+  if (!q) {
+    // No such quote — show a 404 page (Next.js will render /404 if present)
+    notFound();
+  }
+
+  const fullName =
+    [q.firstName, q.lastName, (q as any)?.name].filter(Boolean).join(" ").trim() || "—";
+
+  return (
+    <main className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Quote Details</h1>
+        <Link
+          href="/admin/quotes"
+          className="rounded border border-white/20 px-3 py-1 text-sm hover:bg-white/10"
+        >
+          ← Back to all quotes
+        </Link>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 p-4">
+        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Item label="Received">{formatDenver(q.receivedAt)}</Item>
+          <Item label="Status">{q.status ?? "new"}</Item>
+
+          <Item label="Name">{fullName}</Item>
+          <Item label="Email">{q.email ?? "—"}</Item>
+          <Item label="Phone">{q.phone ?? "—"}</Item>
+          <Item label="Service">{q.service ?? "—"}</Item>
+
+          <Item label="Vehicle (YMM)">{q.ymm ?? "—"}</Item>
+          <Item label="VIN">{q.vin ?? "—"}</Item>
+
+          <Item label="Tint Type">{q.tintType ?? "—"}</Item>
+          <Item label="Tint Shade">{q.tintShade ?? "—"}</Item>
+          <Item label="Vehicle Type">{q.vehicleType ?? "—"}</Item>
+
+          <Item label="Coverage">
+            {Array.isArray(q.coverage) && q.coverage.length ? q.coverage.join(", ") : "—"}
+          </Item>
+          <Item label="Removal Areas">
+            {Array.isArray(q.removalAreas) && q.removalAreas.length
+              ? q.removalAreas.join(", ")
+              : "—"}
+          </Item>
+          <Item label="Chrome Areas">
+            {Array.isArray(q.chromeAreas) && q.chromeAreas.length
+              ? q.chromeAreas.join(", ")
+              : "—"}
+          </Item>
+
+          <Item label="Decal Size">{q.decalSize ?? "—"}</Item>
+          <Item label="Decal Color">{q.decalColor ?? "—"}</Item>
+          <Item label="Decal Placement">{q.decalPlacement ?? "—"}</Item>
+
+          <Item label="Message" className="sm:col-span-2">
+            {q.details ?? q.message ?? "—"}
+          </Item>
+        </dl>
+      </div>
+    </main>
+  );
+}
+
+function Item({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <dt className="text-xs uppercase tracking-wide opacity-60">{label}</dt>
+      <dd className="mt-1 text-sm">{children}</dd>
+    </div>
+  );
 }

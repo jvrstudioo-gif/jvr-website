@@ -1,6 +1,7 @@
 // app/admin/page.tsx
 import Link from "next/link";
 import { readQuotes, type QuoteRecord } from "@/lib/quotes";
+import { formatDenver } from "@/lib/time";
 
 export const revalidate = 0; // always show latest quotes
 
@@ -78,7 +79,7 @@ export default async function AdminPage() {
 
                   return (
                     <tr key={q.id} className="border-t border-white/10">
-                      <Td>{formatDenverTime(q.receivedAt)}</Td>
+                      <Td>{q.receivedAt ? `${formatDenver(q.receivedAt)} • (Denver)` : "—"}</Td>
                       <Td>{displayName}</Td>
                       <Td className="truncate max-w-[220px]" title={q.email ?? undefined}>
                         {q.email ?? "—"}
