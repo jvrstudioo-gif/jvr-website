@@ -22,13 +22,19 @@
       "@/*": ["./*"]
     },
 
+    // 👇 ensure our custom .d.ts files are loaded
+    "typeRoots": ["./types", "./node_modules/@types"],
+
     "plugins": [{ "name": "next" }]
   },
+
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "types/**/*.d.ts"          // 👈 include custom type declarations
   ],
+
   "exclude": ["node_modules"]
 }
