@@ -1,12 +1,11 @@
+// app/page.tsx
 "use client";
-import { useSession } from "next-auth/react";
+
 import Image from "next/image";
 import { FaInstagram, FaTiktok } from "react-icons/fa";
 import Link from "next/link";
 
 export default function Page() {
-  const { data: session } = useSession();
-
   return (
     <main className="bg-black text-white min-h-screen flex flex-col items-center">
       {/* Logo */}
@@ -20,18 +19,6 @@ export default function Page() {
           priority
         />
       </div>
-
-      {/* Admin link — only shows for you */}
-      {session?.user?.email === "jvrstudioo@gmail.com" && (
-        <div className="absolute top-4 right-4">
-          <a
-            href="/admin"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow"
-          >
-            Admin
-          </a>
-        </div>
-      )}
 
       {/* Headline */}
       <h1 className="text-center font-extrabold mt-6 leading-tight">
@@ -54,6 +41,7 @@ export default function Page() {
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-[#3b5bf6]"
+          aria-label="Instagram"
         >
           <FaInstagram size={22} />
         </a>
@@ -62,6 +50,7 @@ export default function Page() {
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-[#3b5bf6]"
+          aria-label="TikTok"
         >
           <FaTiktok size={22} />
         </a>
