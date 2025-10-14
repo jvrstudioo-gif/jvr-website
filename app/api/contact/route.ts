@@ -1,16 +1,32 @@
+// app/api/contact/route.ts
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 
 export const runtime = "nodejs";
 
-function transporter() {
+// Build a robust Gmail transporter.
+// - Uses TLS on 465 (secure: true) or STARTTLS on 587 (secure: false)
+// - Shorter timeouts so failures surface quickly in logs
+function buildTransporter() {
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = Number(process.env.SMTP_PORT || 465);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!user || !pass) {
+    throw new Error("Missing SMTP_USER/SMTP_PASS environment variables.");
+  }
+
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
+    tls: {
+      minVersion: "TLSv1.2",
     },
   });
 }
@@ -18,20 +34,28 @@ function transporter() {
 const ALLOWED_MIME = new Set([
   "image/png",
   "image/jpeg",
-  "image/jpg",          // some browsers use this
+  "image/jpg",
   "image/svg+xml",
 ]);
 
 function isAllowedFile(f: File) {
   if (ALLOWED_MIME.has(f.type)) return true;
-  // fallback by extension if type is blank
   const name = f.name.toLowerCase();
-  return name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".svg");
+  return (
+    name.endsWith(".png") ||
+    name.endsWith(".jpg") ||
+    name.endsWith(".jpeg") ||
+    name.endsWith(".svg")
+  );
 }
 
 async function fileToAttachment(file: File) {
   const buf = Buffer.from(await file.arrayBuffer());
-  return { filename: file.name, content: buf };
+  return {
+    filename: file.name,
+    content: buf,
+    contentType: file.type || "application/octet-stream",
+  };
 }
 
 export async function POST(req: Request) {
@@ -50,10 +74,13 @@ export async function POST(req: Request) {
     const termsAck = form.get("terms_ack") ? "Yes" : "No";
 
     if (!name || !email || !phone || !vehicle || !service || !details) {
-      return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing required fields." },
+        { status: 400 }
+      );
     }
 
-    // Optional service-specific fields
+    // Service-specific fields (all optional)
     const tint = {
       type: String(form.get("tint_type") || ""),
       shade: String(form.get("tint_shade") || ""),
@@ -64,7 +91,9 @@ export async function POST(req: Request) {
         form.get("coverage_full") ? "Full vehicle" : "",
         form.get("coverage_windshield_only") ? "Windshield only" : "",
         form.get("coverage_sunstrip") ? "Windshield strip" : "",
-      ].filter(Boolean).join(", "),
+      ]
+        .filter(Boolean)
+        .join(", "),
     };
 
     const removal = {
@@ -73,7 +102,9 @@ export async function POST(req: Request) {
         form.get("removal_rear") ? "Rear" : "",
         form.get("removal_full") ? "Full vehicle" : "",
         form.get("removal_sunstrip") ? "Sun strip" : "",
-      ].filter(Boolean).join(", "),
+      ]
+        .filter(Boolean)
+        .join(", "),
     };
 
     const chrome = {
@@ -83,7 +114,9 @@ export async function POST(req: Request) {
         form.get("chrome_grille") ? "Grille" : "",
         form.get("chrome_roof_rails") ? "Roof rails" : "",
         form.get("chrome_other") ? "Other" : "",
-      ].filter(Boolean).join(", "),
+      ]
+        .filter(Boolean)
+        .join(", "),
     };
 
     const vinyl = {
@@ -92,7 +125,7 @@ export async function POST(req: Request) {
       placement: String(form.get("vinyl_placement") || ""),
     };
 
-    // Attachments: only allowed types, max 3
+    // Optional attachments (max 3; png/svg/jpg only)
     const rawPhotos = form.getAll("photos").filter((f) => f instanceof File) as File[];
     const allowedPhotos = rawPhotos.filter(isAllowedFile).slice(0, 3);
     const attachments = allowedPhotos.length
@@ -174,10 +207,16 @@ How did you hear about us: ${referral || "—"}
 Agreed to Terms/Privacy: ${termsAck}
 `;
 
-    const mailer = transporter();
-    await mailer.sendMail({
-      from: process.env.FROM_EMAIL || `JVR Studio <${process.env.SMTP_USER}>`,
-      to: "jvrstudioo@gmail.com",
+    const mailer = buildTransporter();
+
+    const fromAddr =
+      process.env.FROM_EMAIL || `JVR Studio <${process.env.SMTP_USER}>`;
+
+    const toAddr = process.env.TO_EMAIL || "jvrstudioo@gmail.com";
+
+    const info = await mailer.sendMail({
+      from: fromAddr,
+      to: toAddr,
       replyTo: email,
       subject,
       text,
@@ -185,9 +224,13 @@ Agreed to Terms/Privacy: ${termsAck}
       attachments,
     });
 
+    console.log("Mail sent:", info.messageId);
     return NextResponse.json({ ok: true }, { status: 200 });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Failed to send email." }, { status: 500 });
+  } catch (err: any) {
+    console.error("Contact email failed:", err?.message || err);
+    return NextResponse.json(
+      { error: "Failed to send email." },
+      { status: 500 }
+    );
   }
 }
