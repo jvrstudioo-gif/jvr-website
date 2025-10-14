@@ -71,7 +71,7 @@ export default function PrivacyPage() {
             <li>Opt out of promotional communications.</li>
           </ul>
           <p>
-            To exercise rights, contact us at <strong>[Insert Business Email]</strong>.
+            To exercise rights, contact us at <strong>[info@jvrestylingstudio.com]</strong>.
           </p>
 
           <h2 className="text-xl font-semibold">8. Third-Party Links</h2>
@@ -94,7 +94,7 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-semibold">11. Contact Us</h2>
           <p>
             <strong>JVR Studio LLC</strong><br />
-            Email: <strong>[jvrstudioo@gmail.com]</strong><br />
+            Email: <strong>[info@jvrestylingstudio.com]</strong><br />
             Phone: <strong>[720-400-0218]</strong>
           </p>
 
