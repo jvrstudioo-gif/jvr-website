@@ -158,7 +158,7 @@ export default function ContactPage() {
               <input
                 name="first_name"
                 required
-                placeholder="Your full name"
+                placeholder="Name"
                 className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
               />
             </div>
