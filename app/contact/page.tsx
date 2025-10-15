@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, FormEvent, ChangeEvent } from "react";
 import Link from "next/link";
 import Footer from "../components/Footer";
 
@@ -8,175 +8,260 @@ type ServiceKey = "" | "Tint" | "Removal" | "Chrome" | "Vinyl";
 
 export default function ContactPage() {
   const [service, setService] = useState<ServiceKey>("");
-  const [status, setStatus] = useState<"idle" | "sending" | "ok" | "err">("idle");
-  const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
 
-  // For custom file input display
-  const [filesLabel, setFilesLabel] = useState<string>("No file selected");
+  const [chromeAreas, setChromeAreas] = useState({
+    windowTrim: false,
+    badges: false,
+    grille: false,
+    roofRails: false,
+    fullDelete: false,
+    other: false,
+  });
 
-  const showTint = service === "Tint";
-  const showRemoval = service === "Removal";
-  const showChrome = service === "Chrome";
-  const showVinyl = service === "Vinyl";
+  const [removalAreas, setRemovalAreas] = useState({
+    front: false,
+    rear: false,
+    full: false,
+    sunstrip: false,
+    windshield: false,
+  });
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const chromeHasOne = useMemo(
+    () =>
+      chromeAreas.windowTrim ||
+      chromeAreas.badges ||
+      chromeAreas.grille ||
+      chromeAreas.roofRails ||
+      chromeAreas.fullDelete ||
+      chromeAreas.other,
+    [chromeAreas]
+  );
+
+  const removalHasOne = useMemo(
+    () =>
+      removalAreas.front ||
+      removalAreas.rear ||
+      removalAreas.full ||
+      removalAreas.sunstrip ||
+      removalAreas.windshield,
+    [removalAreas]
+  );
+
+  const [vinylFilesText, setVinylFilesText] = useState("No file chosen");
+  function onVinylFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) {
+      setVinylFilesText("No file chosen");
+      return;
+    }
+    const names = files.map((f) => f.name).slice(0, 3);
+    setVinylFilesText(names.join(", "));
+  }
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setStatus("sending");
-    setErrMsg(null);
+    setError(null);
+    setOk(false);
 
     const form = e.currentTarget;
     const fd = new FormData(form);
 
-    // limit photos (vinyl) to 3
-    const photos = (fd.getAll("photos") as File[]).filter(Boolean);
-    if (photos.length > 3) {
-      setStatus("err");
-      setErrMsg("Please upload up to 3 photos.");
+    if (service === "Chrome" && !chromeHasOne) {
+      setError("Please select at least one Chrome Delete area.");
+      return;
+    }
+    if (service === "Removal" && !removalHasOne) {
+      setError("Please select at least one Tint Removal area.");
+      return;
+    }
+    if (service === "Vinyl" && !fd.get("vinyl_finish")) {
+      setError("Please choose a Vinyl finish type.");
+      return;
+    }
+    if (!fd.get("deposit_ack") || !fd.get("terms_ack")) {
+      setError("Please agree to the 30% deposit and Terms & Conditions.");
       return;
     }
 
+    setSubmitting(true);
     try {
       const res = await fetch("/api/contact", { method: "POST", body: fd });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error || "Failed to send. Please try again.");
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to send message.");
+
+      setOk(true);
       form.reset();
       setService("");
-      setFilesLabel("No file selected");
-      setStatus("ok");
+      setChromeAreas({
+        windowTrim: false,
+        badges: false,
+        grille: false,
+        roofRails: false,
+        fullDelete: false,
+        other: false,
+      });
+      setRemovalAreas({
+        front: false,
+        rear: false,
+        full: false,
+        sunstrip: false,
+        windshield: false,
+      });
+      setVinylFilesText("No file chosen");
     } catch (err: any) {
-      setStatus("err");
-      setErrMsg(err?.message || "Something went wrong.");
+      setError(err?.message || "Failed to send message.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-black text-white px-4 sm:px-6 py-8 sm:py-12">
-      <div className="max-w-3xl mx-auto">
-        {/* Top Right Back Button */}
-        <div className="flex justify-end mb-6">
+    <main className="min-h-screen bg-black text-white flex flex-col">
+      <header className="mx-auto w-full max-w-5xl px-4 pt-8">
+        <div className="flex items-center justify-end">
           <Link
             href="/"
-            className="bg-[#3B5BF6] hover:bg-purple-600 text-white font-semibold px-4 py-2 rounded-lg transition"
+            className="rounded-lg bg-[#3B5BF6] px-4 py-2 text-sm font-semibold hover:bg-purple-600 transition"
           >
             ← Back to Home
           </Link>
         </div>
 
-        <h1 className="text-3xl sm:text-4xl font-bold text-center mb-8">Contact / Booking</h1>
-        <p className="text-center text-gray-400 mb-8">
+        <h1 className="mt-6 text-center text-3xl sm:text-4xl font-extrabold tracking-tight">
+          Contact / Booking
+        </h1>
+        <p className="mt-3 text-center text-zinc-300">
           Fill out the form below. We’ll reach out with next steps.
         </p>
+      </header>
 
-        {/* Status messages */}
-        {status === "ok" && (
-          <div className="mb-6 rounded-lg border border-green-700 bg-green-900/20 p-4 text-green-200">
+      <div className="mx-auto w-full max-w-3xl px-4 py-8">
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-900 bg-red-950/40 px-4 py-3 text-red-300">
+            {error}
+          </div>
+        )}
+        {ok && (
+          <div className="mb-6 rounded-lg border border-emerald-900 bg-emerald-950/40 px-4 py-3 text-emerald-300">
             Thanks! We will reach out in 3–5 business days.
           </div>
         )}
-        {status === "err" && (
-          <div className="mb-6 rounded-lg border border-red-700 bg-red-900/20 p-4 text-red-200">
-            {errMsg || "There was an issue sending your request."}
-          </div>
-        )}
 
-        <form onSubmit={onSubmit} className="space-y-6" noValidate>
-          {/* Basic info */}
+        <form onSubmit={onSubmit} className="space-y-6">
+          {/* Name / Last name */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block mb-2 text-sm text-gray-300">Name *</label>
+              <label className="mb-1 block text-sm">Name *</label>
               <input
-                name="name"
-                type="text"
+                name="first_name"
                 required
-                className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3B5BF6]"
                 placeholder="Your full name"
+                className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
               />
             </div>
             <div>
-              <label className="block mb-2 text-sm text-gray-300">Phone Number *</label>
+              <label className="mb-1 block text-sm">Last name *</label>
+              <input
+                name="last_name"
+                required
+                placeholder="Last name"
+                className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
+              />
+            </div>
+          </div>
+
+          {/* Email / Phone */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-sm">Email *</label>
+              <input
+                type="email"
+                name="email"
+                required
+                placeholder="Email"
+                className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm">Phone Number *</label>
               <input
                 name="phone"
-                type="tel"
                 required
-                className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3B5BF6]"
                 placeholder="Phone number"
+                className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block mb-2 text-sm text-gray-300">Email *</label>
-              <input
-                name="email"
-                type="email"
-                required
-                className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3B5BF6]"
-                placeholder="Email"
-              />
-            </div>
-            <div>
-              <label className="block mb-2 text-sm text-gray-300">Vehicle (Year / Make / Model) *</label>
-              <input
-                name="vehicle"
-                type="text"
-                required
-                className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3B5BF6]"
-                placeholder="2011 Audi S4"
-              />
-            </div>
-          </div>
-
-          {/* Service selector with placeholder */}
+          {/* Vehicle */}
           <div>
-            <label className="block mb-2 text-sm text-gray-300">Service *</label>
+            <label className="mb-1 block text-sm">Vehicle (Year / Make / Model) *</label>
+            <input
+              name="vehicle"
+              required
+              placeholder="2011 Audi S4"
+              className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
+            />
+          </div>
+
+          {/* Service */}
+          <div>
+            <label className="mb-1 block text-sm">Service *</label>
             <select
               name="service"
               required
               value={service}
               onChange={(e) => setService(e.target.value as ServiceKey)}
-              className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3B5BF6]"
+              className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
             >
               <option value="" disabled>
                 Select Service
               </option>
-              <option value="Tint">Window Tint (Carbon)</option>
+              <option value="Tint">Window Tint</option>
               <option value="Removal">Tint Removal</option>
               <option value="Chrome">Chrome Delete</option>
               <option value="Vinyl">Vinyl Logos &amp; Lettering</option>
             </select>
           </div>
 
-          {/* Service-specific sections */}
+          {/* ===== TINT ===== */}
           {service === "Tint" && (
-            <fieldset className="border border-zinc-800 rounded-xl p-4 sm:p-6">
-              <legend className="px-2 text-lg font-semibold text-[#3B5BF6]">Window Tint Details</legend>
+            <fieldset className="rounded-2xl border border-zinc-800 p-4">
+              <legend className="px-1 text-base sm:text-lg font-semibold text-[#3B5BF6]">
+                Window Tint Details
+              </legend>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
                 <div>
-                  <label className="block mb-2 text-sm text-gray-300">Tint Type *</label>
+                  <label className="mb-1 block text-sm">
+                    Film Type <span className="text-zinc-400">(Geoshield)</span> *
+                  </label>
                   <select
                     name="tint_type"
                     required
-                    className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3B5BF6]"
                     defaultValue=""
+                    className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
                   >
                     <option value="" disabled>
-                      Select tint type
+                      Select film type
                     </option>
-                    <option value="Carbon">Carbon</option>
+                    <option value="Carbon C2">Carbon C2</option>
+                    <option value="Ceramic Film" disabled>
+                      Ceramic Film (coming soon)
+                    </option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block mb-2 text-sm text-gray-300">Shade *</label>
+                  <label className="mb-1 block text-sm">Shade *</label>
                   <select
                     name="tint_shade"
                     required
-                    className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3B5BF6]"
                     defaultValue=""
+                    className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
                   >
                     <option value="" disabled>
                       Select shade
@@ -184,45 +269,45 @@ export default function ContactPage() {
                     <option value="5%">5%</option>
                     <option value="15%">15%</option>
                     <option value="20%">20%</option>
-                    <option value="30%">30%</option>
+                    <option value="35%">35%</option>
                     <option value="50%">50%</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block mb-2 text-sm text-gray-300">Vehicle Type *</label>
+                  <label className="mb-1 block text-sm">Vehicle Type *</label>
                   <select
                     name="tint_vehicle_type"
                     required
-                    className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3B5BF6]"
                     defaultValue=""
+                    className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
                   >
                     <option value="" disabled>
                       Select vehicle type
                     </option>
-                    <option>Coupe</option>
-                    <option>Sedan</option>
-                    <option>SUV / Truck</option>
+                    <option value="Coupe">Coupe</option>
+                    <option value="Sedan">Sedan</option>
+                    <option value="SUV / Truck">SUV / Truck</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block mb-2 text-sm text-gray-300">Coverage *</label>
-                  <div className="grid grid-cols-2 gap-3 text-sm text-gray-300">
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" name="coverage_front" /> Front windows
+                  <label className="mb-1 block text-sm">Coverage</label>
+                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 text-sm mt-2">
+                    <label className="inline-flex items-center gap-2">
+                      <input type="checkbox" name="coverage_front" className="h-4 w-4" /> Front windows
                     </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" name="coverage_rear" /> Rear windows
+                    <label className="inline-flex items-center gap-2">
+                      <input type="checkbox" name="coverage_rear" className="h-4 w-4" /> Rear windows
                     </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" name="coverage_full" /> Full vehicle
+                    <label className="inline-flex items-center gap-2">
+                      <input type="checkbox" name="coverage_full" className="h-4 w-4" /> Full vehicle
                     </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" name="coverage_windshield_only" /> Windshield only
+                    <label className="inline-flex items-center gap-2">
+                      <input type="checkbox" name="coverage_windshield_only" className="h-4 w-4" /> Windshield only
                     </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" name="coverage_sunstrip" /> Windshield strip
+                    <label className="inline-flex items-center gap-2">
+                      <input type="checkbox" name="coverage_sunstrip" className="h-4 w-4" /> Windshield strip
                     </label>
                   </div>
                 </div>
@@ -230,119 +315,150 @@ export default function ContactPage() {
             </fieldset>
           )}
 
+          {/* ===== REMOVAL ===== */}
           {service === "Removal" && (
-            <fieldset className="border border-zinc-800 rounded-xl p-4 sm:p-6">
-              <legend className="px-2 text-lg font-semibold text-[#3B5BF6]">Tint Removal Details</legend>
+            <fieldset className="rounded-2xl border border-zinc-800 p-4">
+              <legend className="px-1 text-base sm:text-lg font-semibold text-[#3B5BF6]">
+                Tint Removal Details
+              </legend>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-gray-300 mt-2">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" name="removal_front" /> Front
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" name="removal_rear" /> Rear
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" name="removal_full" /> Full vehicle
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" name="removal_sunstrip" /> Sun strip
-                </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2 text-sm">
+                {[
+                  ["removal_front", "front"],
+                  ["removal_rear", "rear"],
+                  ["removal_full", "full"],
+                  ["removal_sunstrip", "sunstrip"],
+                  ["removal_windshield", "windshield"],
+                ].map(([name, key]) => (
+                  <label key={name} className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={(removalAreas as any)[key]}
+                      onChange={(e) =>
+                        setRemovalAreas((s) => ({ ...s, [key]: e.target.checked }))
+                      }
+                      name={name}
+                    />
+                    {String(key).charAt(0).toUpperCase() + String(key).slice(1).replace("_", " ")}
+                  </label>
+                ))}
               </div>
+
+              {!removalHasOne && (
+                <p className="mt-3 text-sm text-amber-300">Please select at least one area above.</p>
+              )}
             </fieldset>
           )}
 
+          {/* ===== CHROME ===== */}
           {service === "Chrome" && (
-            <fieldset className="border border-zinc-800 rounded-xl p-4 sm:p-6">
-              <legend className="px-2 text-lg font-semibold text-[#3B5BF6]">Chrome Delete Details</legend>
+            <fieldset className="rounded-2xl border border-zinc-800 p-4">
+              <legend className="px-1 text-base sm:text-lg font-semibold text-[#3B5BF6]">
+                Chrome Delete Details
+              </legend>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm text-gray-300 mt-2">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" name="chrome_window_trim" /> Window trim
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" name="chrome_badges" /> Badges
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" name="chrome_grille" /> Grille
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" name="chrome_roof_rails" /> Roof rails
-                </label>
-                <label className="flex items-center gap-2 col-span-2 sm:col-span-1">
-                  <input type="checkbox" name="chrome_other" /> Other
-                </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2 text-sm">
+                {[
+                  ["chrome_window_trim", "windowTrim", "Window trim"],
+                  ["chrome_badges", "badges", "Badges"],
+                  ["chrome_grille", "grille", "Grille"],
+                  ["chrome_roof_rails", "roofRails", "Roof rails"],
+                  ["chrome_full_delete", "fullDelete", "Full chrome delete"],
+                  ["chrome_other", "other", "Other"],
+                ].map(([name, key, label]) => (
+                  <label key={name} className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={(chromeAreas as any)[key]}
+                      onChange={(e) =>
+                        setChromeAreas((s) => ({ ...s, [key]: e.target.checked }))
+                      }
+                      name={name}
+                    />
+                    {label}
+                  </label>
+                ))}
               </div>
+
+              {!chromeHasOne && (
+                <p className="mt-3 text-sm text-amber-300">Please select at least one area above.</p>
+              )}
             </fieldset>
           )}
 
+          {/* ===== VINYL ===== */}
           {service === "Vinyl" && (
-            <fieldset className="border border-zinc-800 rounded-xl p-4 sm:p-6">
-              <legend className="px-2 text-lg font-semibold text-[#3B5BF6]">
+            <fieldset className="rounded-2xl border border-zinc-800 p-4">
+              <legend className="px-1 text-base sm:text-lg font-semibold text-[#3B5BF6]">
                 Vinyl Logos &amp; Lettering Details
               </legend>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
                 <div>
-                  <label className="block mb-2 text-sm text-gray-300">Approx. Size *</label>
+                  <label className="mb-1 block text-sm">Approx. Size</label>
                   <input
                     name="vinyl_size"
-                    required
                     placeholder={`e.g. "12in x 4in"`}
-                    className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3B5BF6]"
+                    className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
                   />
                 </div>
                 <div>
-                  <label className="block mb-2 text-sm text-gray-300">Color *</label>
+                  <label className="mb-1 block text-sm">Color</label>
                   <input
                     name="vinyl_color"
-                    required
-                    placeholder={`e.g. "White (matte)"`}
-                    className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3B5BF6]"
+                    placeholder={`e.g. "Blue"`}
+                    className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
                   />
                 </div>
                 <div>
-                  <label className="block mb-2 text-sm text-gray-300">Placement *</label>
+                  <label className="mb-1 block text-sm">Finish Type *</label>
+                  <select
+                    name="vinyl_finish"
+                    required
+                    defaultValue=""
+                    className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
+                  >
+                    <option value="" disabled>
+                      Select finish
+                    </option>
+                    <option value="Gloss">Gloss</option>
+                    <option value="Matte">Matte</option>
+                    <option value="Satin">Satin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm">Placement</label>
                   <input
                     name="vinyl_placement"
-                    required
                     placeholder={`e.g. "Rear window top center"`}
-                    className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3B5BF6]"
+                    className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
                   />
                 </div>
               </div>
 
-              {/* Optional photos — custom "Choose File" control */}
-              <div className="mt-4">
-                <div className="flex items-center justify-between">
-                  <label className="block text-sm text-gray-300">
-                    Upload image here <span className="text-gray-500">(PNG, SVG, or JPG files)</span>
-                  </label>
-                  <span className="text-xs text-gray-500">Optional (up to 3)</span>
-                </div>
-
-                {/* Hidden native input */}
-                <input
-                  id="photos-input"
-                  name="photos"
-                  type="file"
-                  accept="image/png,image/svg+xml,image/jpeg"
-                  multiple
-                  className="sr-only"
-                  onChange={(e) => {
-                    const f = Array.from(e.target.files || []);
-                    setFilesLabel(f.length ? f.map((x) => x.name).slice(0, 3).join(", ") : "No file selected");
-                  }}
-                />
-
-                {/* Custom trigger + filename display */}
-                <div className="mt-2 flex flex-col sm:flex-row items-start sm:items-center gap-2">
+              <div className="mt-3">
+                <label className="mb-1 block text-sm">
+                  Upload image (optional) <span className="text-zinc-400">(png, svg, jpg)</span>
+                </label>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <input
+                    id="vinyl-photos"
+                    type="file"
+                    name="photos"
+                    multiple
+                    onChange={onVinylFileChange}
+                    accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml"
+                    className="sr-only"
+                  />
                   <label
-                    htmlFor="photos-input"
-                    className="cursor-pointer inline-flex items-center justify-center rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 px-4 py-2 text-sm"
+                    htmlFor="vinyl-photos"
+                    className="cursor-pointer inline-flex items-center justify-center rounded-md bg-zinc-800 px-4 py-2 text-sm font-medium hover:bg-zinc-700"
                   >
-                    Choose File
+                    Choose Files
                   </label>
-                  <span className="text-xs text-gray-400">{filesLabel}</span>
+                  <span className="text-sm text-gray-300">{vinylFilesText}</span>
                 </div>
               </div>
             </fieldset>
@@ -350,85 +466,89 @@ export default function ContactPage() {
 
           {/* Project details */}
           <div>
-            <label className="block mb-2 text-sm text-gray-300">Tell us more about your project *</label>
+            <label className="mb-1 block text-sm">Tell us more about your project</label>
             <textarea
               name="details"
-              required
               rows={5}
-              className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3B5BF6]"
               placeholder="What would you like done? Any specifics we should know?"
+              className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
             />
           </div>
 
-          {/* How did you hear about us? (optional) */}
+          {/* Referral */}
           <div>
-            <label className="block mb-2 text-sm text-gray-300">
-              How did you hear about us? (optional)
-            </label>
+            <label className="mb-1 block text-sm">How did you hear about us? (optional)</label>
             <select
               name="referral"
               defaultValue=""
-              className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3B5BF6]"
+              className="w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-3"
             >
-              <option value="">Select one</option>
-              <option>Instagram</option>
-              <option>TikTok</option>
-              <option>Google</option>
-              <option>Referral</option>
-              <option>Other</option>
+              <option value="" disabled>
+                Select one
+              </option>
+              <option value="Instagram">Instagram</option>
+              <option value="TikTok">TikTok</option>
+              <option value="Google">Google</option>
+              <option value="Referral">Referral</option>
             </select>
           </div>
 
-          {/* Terms block */}
-          <div className="space-y-2">
-            <label className="flex items-start gap-3 text-sm text-gray-200">
-              <input type="checkbox" name="deposit_ack" required className="mt-1" />
+          {/* Policy checks (with highlights) */}
+          <div className="space-y-4 text-sm">
+            <label className="flex items-start gap-3">
+              <input type="checkbox" name="deposit_ack" required className="mt-1 h-4 w-4" />
               <span>
-                I understand a <span className="font-semibold text-white">30% deposit</span> is required to confirm booking.
+                I understand a{" "}
+                <strong className="text-[#3B5BF6]">30% deposit</strong> is required to confirm
+                booking.
               </span>
             </label>
 
-            <label className="flex items-start gap-3 text-sm text-gray-200">
-              <input type="checkbox" name="terms_ack" required className="mt-1" />
+            <label className="flex items-start gap-3">
+              <input type="checkbox" name="terms_ack" required className="mt-1 h-4 w-4" />
               <span>
                 I agree to the{" "}
-                <Link href="/terms" className="underline decoration-[#3B5BF6] underline-offset-4 hover:text-[#3B5BF6]">
+                <Link
+                  href="/terms"
+                  className="font-semibold text-[#3B5BF6] underline underline-offset-4"
+                >
                   Terms &amp; Conditions
                 </Link>
                 .
               </span>
             </label>
 
-            <p className="text-sm text-gray-400">
-              By providing your phone number and/or email address via the form above, you agree to
-              receive messages, including appointment reminders, at the contact details provided and
-              confirm you agree to the processing of your personal data as described in our{" "}
-              <Link href="/privacy" className="underline decoration-[#3B5BF6] underline-offset-4 hover:text-[#3B5BF6]">
+            <p className="text-zinc-400">
+              By providing your phone number and <strong>email address</strong> via the form above,
+              you agree to receive messages, including appointment reminders, and consent to the
+              processing of your personal data as described in our{" "}
+              <Link
+                href="/privacy"
+                className="font-semibold text-[#3B5BF6] underline underline-offset-4"
+              >
                 Privacy Policy
-              </Link>.
+              </Link>
+              .
             </p>
           </div>
 
-          {/* Submit */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={status === "sending"}
-              className="inline-flex items-center justify-center rounded-lg bg-[#3B5BF6] hover:bg-purple-600 px-6 py-3 font-semibold text-white transition disabled:opacity-60"
-            >
-              {status === "sending" ? "Sending..." : "Request Booking"}
-            </button>
-          </div>
-        </form>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full sm:w-auto rounded-lg bg-[#3B5BF6] px-6 py-3 font-semibold text-white transition hover:bg-purple-600 disabled:opacity-60"
+          >
+            {submitting ? "Sending…" : "Request Booking"}
+          </button>
 
-        {/* Questions line */}
-        <p className="mt-12 mb-10 text-center italic text-gray-300">
-          Questions? Email{" "}
-          <a href="mailto:info@jvrestylingstudio.com" className="underline">info@jvrestylingstudio.com</a>
-        </p>
+          <p className="mt-8 text-center text-sm text-zinc-400 italic">
+            Questions? Email{" "}
+            <a href="mailto:info@jvrestylingstudio.com" className="underline">
+              info@jvrestylingstudio.com
+            </a>
+          </p>
+        </form>
       </div>
 
-      {/* Footer */}
       <Footer />
     </main>
   );
