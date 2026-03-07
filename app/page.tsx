@@ -121,7 +121,7 @@ export default function Page() {
       <section className="w-full bg-black pb-20">
         <div className="max-w-5xl mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-2">Contact</h2>
-          <p className="mb-8 text-gray-300">Aurora, CO • By appointment only</p>
+          <p className="mb-8 text-gray-300">Denver, CO • By appointment only</p>
 
           <div className="flex flex-wrap justify-center gap-4">
             <a
